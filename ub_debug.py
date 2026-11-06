@@ -43,7 +43,7 @@ def debug_full_info(function):
         for i in caller_frame:
             # Due to how wrappers work, we're going to have the debug helper technically calling every function, but we don't want to see that in the log.
             file_name = i.filename.split(os.sep)[-1]
-            if (file_name != 'ub_debug.py' and file_name != '__init__.py' and file_name != '__init__.pyc' and file_name != 'ub_debug.pyc') and (file_name not in chain_of_command):
+            if (file_name != 'ub_debug.py' and file_name != '__init__.py' and file_name != '__init__.pyc' and file_name != 'ub_debug.pyc' and file_name != 'ub_utils.ub_debug.py') and (file_name not in chain_of_command):
                 chain_of_command.insert(0,file_name)
         chain_of_command = ' -> '.join(chain_of_command)
 
@@ -91,7 +91,7 @@ def debug_measure_speed(function):
         for i in caller_frame:
             # Due to how wrappers work, we're going to have the debug helper technically calling every function, but we don't want to see that in the log.
             file_name = i.filename.split(os.sep)[-1]
-            if (file_name != 'ub_debug.py' and file_name != '__init__.py' and file_name != '__init__.pyc' and file_name != 'ub_debug.pyc') and (file_name not in chain_of_command):
+            if (file_name != 'ub_debug.py' and file_name != '__init__.py' and file_name != '__init__.pyc' and file_name != 'ub_debug.pyc' and file_name != 'ub_utils.ub_debug.py') and (file_name not in chain_of_command):
                 chain_of_command.insert(0,file_name)
         chain_of_command = ' -> '.join(chain_of_command)
 
@@ -153,7 +153,7 @@ def close_log_file():
 def get_imported_ub_modules():
     module_list = []
     for name, module in sys.modules.items():
-        if name.startswith('ub_') and name != 'ub_debug':
+        if name.startswith('ub_') and (name != 'ub_debug' and name != 'ub_utils.ub_debug'):
             module_list.append(module)
     return module_list
 

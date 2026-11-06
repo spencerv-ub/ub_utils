@@ -17,7 +17,7 @@ import getpass
 from datetime import datetime
 from packaging.version import Version
 
-import ub_debug
+import ub_utils.ub_debug as ub_debug
 
 # Big Variables
 

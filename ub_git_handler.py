@@ -1,6 +1,6 @@
 import subprocess
 import pathlib
-import ub_utility
+import ub_utils.ub_utility as ub_utility
 import win32cred
 import win32timezone
 
