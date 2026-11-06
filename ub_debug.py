@@ -159,6 +159,13 @@ def get_imported_ub_modules():
 
 
 def log(message_type: str, message: str):
+    '''
+    Available options for message type are:
+    - info
+    - debug
+    - warning
+    - error
+    '''
     message_type_prefix, message_level = _stamp_log_prefix_level(message_type=message_type)
 
     if DEBUG_MODE:
