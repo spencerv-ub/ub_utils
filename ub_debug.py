@@ -7,9 +7,9 @@ import sys
 from datetime import datetime
 import pathlib
 
-DEFER_PRINT = True
+DEFER_PRINT = False
 DEBUG_MODE = True
-LOG_LEVEL = 0
+LOG_LEVEL = 2
 # Write all of the print statements generated to a text file.
 # Makes it easier than passing around the file name to write to.
 if DEFER_PRINT:
@@ -23,8 +23,8 @@ READABLE_INDENTS = True
 arbitrary_process_id = 0
 running_indent = -1
 
-def print_startup(debug_mode):
-    if debug_mode:
+def print_startup():
+    if DEBUG_MODE:
         print(f'===\nDEBUG MODE IS ACTIVE\n---\nPrint long entries is set to: {PRINT_LONG_ENTRY}\nReadable Indents is set to: {READABLE_INDENTS}\n===\nGUI wrappers will attempt to flag every function for logging now...\n')
 
 def debug_full_info(function):
@@ -35,7 +35,7 @@ def debug_full_info(function):
         local_arbitrary_process_id = arbitrary_process_id
         if READABLE_INDENTS: running_indent = running_indent + 1
         local_indent = running_indent
-        preamble = f'{'\t'*local_indent}'
+        preamble = f'{_build_log_prefix('info')}{'\t'*local_indent}'
 
         caller_frame = inspect.stack()
         
@@ -126,7 +126,7 @@ def _truncate_string(string: str):
     # If a string is more than 72 characters, truncate it.
     string = string.replace('\n','')
     if (not PRINT_LONG_ENTRY) and (len(string) > 72):
-        string = f'{string[:72]}... (Long entry truncated for debug readability. To change this, set PRINT_LONG_ENTRY to True in debug_helper.py)'
+        string = f'{string[:72]}... (Long entry truncated for debug readability. To change this, set PRINT_LONG_ENTRY to True in ub_debug.py)'
     return string 
 
 def _dict_list_check(object_to_check: any, indent_string: str):
@@ -138,7 +138,7 @@ def _dict_list_check(object_to_check: any, indent_string: str):
                     # Better safe than sorry. Check every entry is a dict before converting.
                     if isinstance(i, dict):
                         dummy_list = f'{dummy_list}\n{indent_string}{_dict_to_string(i, indent_string=indent_string)}'
-                dummy_list = f'{dummy_list}\n)'
+                dummy_list = f'{dummy_list}\n{indent_string})'
                 return dummy_list
             else:
                 return object_to_check
@@ -159,13 +159,6 @@ def get_imported_ub_modules():
 
 
 def log(message_type: str, message: str):
-    '''
-    Available options for message type are:
-    - info
-    - debug
-    - warning
-    - error
-    '''
     message_type_prefix, message_level = _stamp_log_prefix_level(message_type=message_type)
 
     if DEBUG_MODE:
