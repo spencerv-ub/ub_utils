@@ -7,7 +7,7 @@ import sys
 from datetime import datetime
 import pathlib
 
-DEFER_PRINT = False
+DEFER_PRINT = True
 DEBUG_MODE = True
 LOG_LEVEL = 2
 # Write all of the print statements generated to a text file.
@@ -226,3 +226,19 @@ def broken_log(message_type: str, message: str):
             message_prefix = f'[{_stamp_log_prefix_time()}] - [{message_type_prefix}]: '
             full_message = f'{message_prefix}{message}'
             print(full_message)
+
+
+def easy_dict_print(dict_to_prune: dict):
+    # Some keys muddy up printing the dictionary to the log file.
+    # This makes it easy to remove them.
+    easy_dict = dict_to_prune.copy()
+
+    keys_to_remove = ['PCTEXT', 'SQLTXT']
+
+    for key in keys_to_remove:
+        # Dictionaries being used as iterators can't be modified mid-iteration.
+        # To solve this, we've made 2 identical dictionaries. One to loop through, one to modify.
+        if key in dict_to_prune.keys():
+            del easy_dict[key]
+
+    return easy_dict

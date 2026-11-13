@@ -426,27 +426,72 @@ def build_backup_filename(id_list: list, dictionary: dict):
 def process_peoplecode_dict_list(dictionary_list: list):
     condense_list = {}
 
-    for i in dictionary_list:
-        if i['PROGSEQ'] != 0:
-            condense_list[f'{i['HASH_SIGNATURE']} 0'] = []
-            for j in dictionary_list:
-                if (i['HASH_SIGNATURE'] == j['HASH_SIGNATURE']):
-                    condense_list[f'{i['HASH_SIGNATURE']} 0'].append((j['PROGSEQ'],j))
-
-    for i in condense_list.keys():
-        k = list(sorted(condense_list[i], key=lambda e: e[0]))
-        for j in k:
-            if j[0] != 0:
-                k[0][1]['PCTEXT'] = k[0][1]['PCTEXT'] + j[1]['PCTEXT']
-                dictionary_list.remove(j[1])
-        condense_list[i] = k[0][1]
-        
-    for i in dictionary_list:
-        for j in condense_list.values():
-            if (i['HASH_SIGNATURE'] == j['HASH_SIGNATURE']) and (j['PROGSEQ'] == i['PROGSEQ']):
-                i = j
-
+    # De-dupe list immediately as sometimes the queries can return multiple rows for the same PeopleCode
+    # Especially in the case of nested classes/packs.
     dictionary_list = remove_duplicate_entries(dictionary_list)
+
+    ub_debug.log('debug', 'Beginning attempt to condense PeopleCode Dict List.')
+
+    # Loop through the provided list, make a collection of every peoplecode object by hash and store the rows associated with it.
+    for row in dictionary_list:
+        if f'{row['HASH_SIGNATURE']}' not in condense_list.keys():
+            condense_list[f'{row['HASH_SIGNATURE']}'] = []
+        if (row['PROGSEQ'],row) not in condense_list[f'{row['HASH_SIGNATURE']}']:
+            ub_debug.log('debug', f'Found entry for hash {row['HASH_SIGNATURE']} that was not in list to condense, progseq is: {row['PROGSEQ']}.')
+            condense_list[f'{row['HASH_SIGNATURE']}'].append((row['PROGSEQ'],row))
+
+    if ub_debug.DEBUG_MODE:
+        for log_entry in condense_list.keys():
+            ub_debug.log('debug', f'Need to sequence: {log_entry}, number of entries: {len(condense_list[log_entry])}')
+
+    # For every entry in the created list:
+    # 1. Sort the rows by progseq
+    # 2. Loop through the collected rows
+    #  2a. Append the peoplecode contents of the row to a running string.
+    #  2b. Remove the row from the original dict list.
+    # 3. Set the entry in the condense list to the running string.
+    for entry_to_condense in condense_list.keys():
+        rows_to_condense = list(sorted(condense_list[entry_to_condense], key=lambda row: row[0]))
+        peoplecode_text = ''
+        for entry in rows_to_condense:
+            ub_debug.log('debug', f'Attempting to append progseq {entry[0]} for hash value: {entry_to_condense}')
+            peoplecode_text = f'{peoplecode_text}{entry[1]['PCTEXT']}'
+            ub_debug.log('debug', f'Attempting to remove row from running dictionary list: {ub_debug.easy_dict_print(entry[1])}')
+            # Why is this so important?
+            if entry[0] != 0:
+                dictionary_list.remove(entry[1])
+            ub_debug.log('debug', f'Dictionary list is now {len(dictionary_list)} entries long.')
+        condense_list[entry_to_condense] = peoplecode_text
+
+    # Now that we have a list of hashes with compiled peoplecode, we need to find the entries with those hash values.
+    # Loop through the list to find where the hash value matches an entry in the condense list and the progseq is 0.
+    for running_process_list_entry in dictionary_list:
+        for condense_list_entry in condense_list.keys():
+            if (running_process_list_entry['HASH_SIGNATURE'] == condense_list_entry): 
+                ub_debug.log('debug', f'Hash values match between these two entries:')
+                ub_debug.log('debug', f'{ub_debug.easy_dict_print(running_process_list_entry)}')
+                ub_debug.log('debug', f'{condense_list_entry}')
+                running_process_list_entry['PCTEXT'] = condense_list[condense_list_entry]
+
+    # De-dupe list just to be safe.
+    dictionary_list = remove_duplicate_entries(dictionary_list)
+
+    # Show if there are any duplicate rows after de-duping
+    if ub_debug.DEBUG_MODE:
+        dummy_compare_list = []
+        for entry in dictionary_list:
+            keys_to_ignore = ['PROGSEQ','PCTEXT']
+            dummy_compare_entry = entry.copy()
+            for key in keys_to_ignore:
+                if key in dummy_compare_entry.keys():
+                    del dummy_compare_entry[key]
+            
+            if dummy_compare_entry not in dummy_compare_list:
+                ub_debug.log('debug', f'Found new entry: {ub_debug.easy_dict_print(dummy_compare_entry)}')
+                dummy_compare_list.append(dummy_compare_entry)
+            else:
+                ub_debug.log('debug', f'Found missed duplicate entry: {ub_debug.easy_dict_print(dummy_compare_entry)}')
+                        
 
     # Now process everything.
     for i in dictionary_list:
