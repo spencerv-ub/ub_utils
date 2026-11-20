@@ -1,3 +1,7 @@
+# UB functions for handling logging.
+# Level 0.
+# Does not rely on other utility packages.
+
 import types
 from functools import wraps
 import time
@@ -7,15 +11,18 @@ import sys
 from datetime import datetime
 import pathlib
 
+# Turns the file location into a path object to allow us to do some shenanigans
+SELF = os.path.abspath(__file__)
+# Said shenanigans.
+SELF_NAME_FILE, SELF_NAME_EXTE = os.path.splitext(os.path.basename(SELF))
+SELF_NAME_FULL = os.path.basename(SELF)
+PARENT_DIRECTORY = os.path.dirname(SELF)
+
 DEFER_PRINT = True
-DEBUG_MODE = True
+LOG_MODE = True
 LOG_LEVEL = 2
 # Write all of the print statements generated to a text file.
 # Makes it easier than passing around the file name to write to.
-if DEFER_PRINT:
-    pathlib.Path('./logs/').mkdir(parents=True, exist_ok=True)
-    filename_builder = f'./logs/LOG - {datetime.now().strftime("%Y-%m-%d -- %H%M")}.txt'
-    sys.stdout = open(filename_builder, 'w')
 
 PRINT_LONG_ENTRY = False
 READABLE_INDENTS = True
@@ -23,11 +30,17 @@ READABLE_INDENTS = True
 arbitrary_process_id = 0
 running_indent = -1
 
+def build_log_file():
+    if DEFER_PRINT:
+        pathlib.Path('./logs/').mkdir(parents=True, exist_ok=True)
+        filename_builder = f'./logs/LOG - {datetime.now().strftime("%Y-%m-%d -- %H%M")}.txt'
+        sys.stdout = open(filename_builder, 'w')
+
 def print_startup():
-    if DEBUG_MODE:
+    if LOG_MODE:
         print(f'===\nDEBUG MODE IS ACTIVE\n---\nPrint long entries is set to: {PRINT_LONG_ENTRY}\nReadable Indents is set to: {READABLE_INDENTS}\n===\nGUI wrappers will attempt to flag every function for logging now...\n')
 
-def debug_full_info(function):
+def log_full_info(function):
     @wraps(function)
     def wrapper(*args, **kwargs):
         global arbitrary_process_id, running_indent
@@ -42,14 +55,14 @@ def debug_full_info(function):
         chain_of_command = []
         for i in caller_frame:
             # Due to how wrappers work, we're going to have the debug helper technically calling every function, but we don't want to see that in the log.
-            file_name = i.filename.split(os.sep)[-1]
-            if (file_name != 'ub_debug.py' and file_name != '__init__.py' and file_name != '__init__.pyc' and file_name != 'ub_debug.pyc' and file_name != 'ub_utils.ub_debug.py') and (file_name not in chain_of_command):
+            file_name = os.path.splitext(os.path.basename(i.filename))[0]
+            if (file_name != SELF_NAME_FILE and file_name != '__init__' and file_name != f'ub_utils.{SELF_NAME_FILE}') and (file_name not in chain_of_command):
                 chain_of_command.insert(0,file_name)
         chain_of_command = ' -> '.join(chain_of_command)
 
         function_arguments = inspect.signature(function).bind(*args, **kwargs).arguments
         for i in function_arguments:
-            if i == 'password':
+            if 'password' in i.lower():
                 function_arguments[i] = f'[PASSWORD REMOVED]'
             elif isinstance(function_arguments[i], dict):
                 function_arguments[i] = _dict_to_string(function_arguments[i], indent_string=preamble)
@@ -75,7 +88,7 @@ def debug_full_info(function):
         return function_result
     return wrapper
 
-def debug_measure_speed(function):
+def log_measure_speed(function):
     @wraps(function)
     def wrapper(*args, **kwargs):
         global arbitrary_process_id, running_indent
@@ -90,8 +103,8 @@ def debug_measure_speed(function):
         chain_of_command = []
         for i in caller_frame:
             # Due to how wrappers work, we're going to have the debug helper technically calling every function, but we don't want to see that in the log.
-            file_name = i.filename.split(os.sep)[-1]
-            if (file_name != 'ub_debug.py' and file_name != '__init__.py' and file_name != '__init__.pyc' and file_name != 'ub_debug.pyc' and file_name != 'ub_utils.ub_debug.py') and (file_name not in chain_of_command):
+            file_name = os.path.splitext(os.path.basename(i.filename))[0]
+            if (file_name != SELF_NAME_FILE and file_name != '__init__' and file_name != f'ub_utils.{SELF_NAME_FILE}') and (file_name not in chain_of_command):
                 chain_of_command.insert(0,file_name)
         chain_of_command = ' -> '.join(chain_of_command)
 
@@ -153,7 +166,7 @@ def close_log_file():
 def get_imported_ub_modules():
     module_list = []
     for name, module in sys.modules.items():
-        if name.startswith('ub_') and (name != 'ub_debug' and name != 'ub_utils.ub_debug'):
+        if name.startswith('ub_utils.') and (name != SELF_NAME_FILE and name != f'ub_utils.{SELF_NAME_FILE}'):
             module_list.append(module)
     return module_list
 
@@ -168,7 +181,7 @@ def log(message_type: str, message: str):
     '''
     message_type_prefix, message_level = _stamp_log_prefix_level(message_type=message_type)
 
-    if DEBUG_MODE:
+    if LOG_MODE:
         # Level 0, only print errors, warnings, or unknowns
         # Level 1, print errors, warnings, unknowns, and general info
         # Level 2, print debug info, errors, warnings, unknowns, and general info
@@ -212,22 +225,6 @@ def _stamp_log_prefix_level(message_type: str):
     
     return message_type_prefix, message_level
 
-
-def broken_log(message_type: str, message: str):
-    message_type_prefix, message_level = _stamp_log_prefix_level(message_type=message_type)
-
-    if DEBUG_MODE:
-        # Level 0, only print errors, warnings, or unknowns
-        # Level 1, print errors, warnings, unknowns, and general info
-        # Level 2, print debug info, errors, warnings, unknowns, and general info
-
-        # Be careful where you are reading for logs, as with multi-threaded processes these logs get messy very quickly.
-        if LOG_LEVEL >= message_level:
-            message_prefix = f'[{_stamp_log_prefix_time()}] - [{message_type_prefix}]: '
-            full_message = f'{message_prefix}{message}'
-            print(full_message)
-
-
 def easy_dict_print(dict_to_prune: dict):
     # Some keys muddy up printing the dictionary to the log file.
     # This makes it easy to remove them.
@@ -242,3 +239,7 @@ def easy_dict_print(dict_to_prune: dict):
             del easy_dict[key]
 
     return easy_dict
+
+if __name__ != '__main__':
+    # Only run code when imported.
+    build_log_file()
